@@ -1,0 +1,9 @@
+__pycache__/
+.pytest_cache/
+.env
+*.db
+storage/
+data/chromadb/
+data/uploads/
+data/flan_t5_adapter/
+*.log

@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dsatm_fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:///./qpgen.db
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_PRIMARY_MODEL: phi4-mini
+      OLLAMA_VISION_MODEL: llava
+      STORAGE_ROOT: /app/storage
+    volumes:
+      - ./storage:/app/storage
+      - ./data:/app/data
+      - ./.env:/app/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: dsatm_postgres_prod
+    environment:
+      POSTGRES_USER: dsatm_user
+      POSTGRES_PASSWORD: dsatm_password
+      POSTGRES_DB: dsatm_qpgen
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dsatm_user -d dsatm_qpgen"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    container_name: dsatm_mongodb_prod
+    environment:
+      MONGO_INITDB_DATABASE: dsatm_docs
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mongodb_data:

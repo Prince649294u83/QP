@@ -1,0 +1,48 @@
+[project]
+name = "qpgen-backend"
+version = "0.1.0"
+description = "FastAPI backend for the AI Question Paper Generator"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.14.0,<2.0.0",
+  "fastapi>=0.115.0,<1.0.0",
+  "uvicorn[standard]>=0.30.0,<1.0.0",
+  "sqlalchemy>=2.0.36,<3.0.0",
+  "pydantic-settings>=2.6.1,<3.0.0",
+  "python-jose[cryptography]>=3.3.0,<4.0.0",
+  "passlib[bcrypt]>=1.7.4,<2.0.0",
+  "python-multipart>=0.0.12,<1.0.0",
+  "python-docx>=1.1.2,<2.0.0",
+  "pypdf>=5.1.0,<6.0.0",
+  "PyMuPDF>=1.24.0,<2.0.0",
+  "pdfplumber>=0.11.0,<1.0.0",
+  "pillow>=11.0.0,<12.0.0",
+  "httpx>=0.27.2,<1.0.0",
+  "ollama>=0.2.1,<1.0.0",
+  "tiktoken>=0.5.0,<1.0.0",
+  "websockets>=11.0.0,<12.0.0",
+  "sentence-transformers>=3.0.0,<6.0.0",
+  "numpy>=1.24.0,<2.0.0",
+  "slowapi>=0.1.8,<0.2.0",
+  "python-pptx>=1.0.0,<2.0.0",
+  "reportlab>=4.2.0,<5.0.0",
+  "asyncpg>=0.29.0,<1.0.0",
+  "chromadb>=0.5.0,<1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.3,<9.0.0",
+  "pytest-cov>=6.0.0,<7.0.0"
+]
+
+[tool.setuptools]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
