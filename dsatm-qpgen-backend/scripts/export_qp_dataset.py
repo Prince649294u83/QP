@@ -127,7 +127,7 @@ async def main():
         os.makedirs(pdf_dir, exist_ok=True)
         return
         
-    llm = LLMCall(model="phi4-mini")
+    llm = LLMCall(model="phi4-mini", timeout=1800.0)
     
     extracted_data = []
     
