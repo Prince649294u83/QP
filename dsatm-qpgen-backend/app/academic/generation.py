@@ -168,6 +168,32 @@ def _normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _extract_pure_text(text: str) -> str:
+    """If the LLM returned a JSON string or markdown block inside the text field, parse it out."""
+    import json
+    
+    text = text.strip()
+    
+    # Strip markdown block if it exists
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json|txt|markdown)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+        
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                # Look for a common key
+                for key in ["question", "text", "output", "generated"]:
+                    if key in parsed and isinstance(parsed[key], str):
+                        return _normalize_text(parsed[key])
+        except json.JSONDecodeError:
+            pass
+            
+    return _normalize_text(text)
+
+
 def _clean_topic_label(label: str | None) -> str:
     if not label:
         return ""
@@ -614,7 +640,7 @@ async def _generate_llm_questions_async(
                 slot_id = int(item.get("slot_id"))
             except (TypeError, ValueError):
                 continue
-            text = _normalize_text(str(item.get("text", "")))
+            text = _extract_pure_text(str(item.get("text", "")))
             if len(text.split()) < 5:
                 continue
             source_indices = [
@@ -705,7 +731,7 @@ Example JSON output:
             timeout=settings.ollama_generation_timeout_seconds,
         )
         if raw_result and "text" in raw_result:
-            return _normalize_text(str(raw_result["text"]))
+            return _extract_pure_text(str(raw_result["text"]))
     except Exception as exc:
         logger.error("Regeneration LLM call failed for slot %s: %s", slot.slot_id, exc)
     return None

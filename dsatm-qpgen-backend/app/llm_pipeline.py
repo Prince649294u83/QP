@@ -38,6 +38,25 @@ def _extract_json_object(raw: str) -> dict[str, Any] | None:
         return None
 
 
+def _extract_pure_text(text: str) -> str:
+    import re
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json|txt|markdown)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        text = text.strip()
+    if text.startswith("{") and text.endswith("}"):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, dict):
+                for key in ["question", "text", "output", "generated"]:
+                    if key in parsed and isinstance(parsed[key], str):
+                        return parsed[key].strip()
+        except json.JSONDecodeError:
+            pass
+    return text
+
+
 class LLMCall:
     """Unified low-level Ollama interface."""
 
@@ -351,7 +370,7 @@ Generate the new question:
         response = self.llm(prompt, system)
         
         if isinstance(response, dict) and isinstance(response.get("question"), str):
-            new_q = response["question"].strip()
+            new_q = _extract_pure_text(response["question"])
             if new_q and len(new_q) > 10:
                 logger.info(f"Generated {difficulty} question: {new_q[:50]}...")
                 return new_q

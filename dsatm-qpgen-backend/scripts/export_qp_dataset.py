@@ -14,7 +14,7 @@ import base64
 
 DATASET_EXTRACTION_PROMPT = """
 You are an expert academic parser building a multi-modal fine-tuning dataset.
-Extract all exam questions from the provided text and images. For each question, carefully infer its true academic properties.
+Extract all exam questions from the provided text and images. For each question, carefully infer its true academic properties, and extract the academic context that supports the question.
 
 If a question refers to or relies on one of the provided images (like a circuit diagram, graph, or flowchart), set "has_image" to true and include an "<image>" token in the question text where the image belongs.
 
@@ -22,6 +22,7 @@ Return STRICT JSON format with NO extra text or markdown blocks:
 {
   "questions": [
     {
+      "context": "The extracted paragraph or summary of the academic concept the question is based on...",
       "text": "...",
       "marks": number,
       "topic": "...",
@@ -41,7 +42,7 @@ def get_base64_image(image_path: str) -> str:
 
 async def process_pdf(pdf_path: str, llm: LLMCall) -> list[dict]:
     print(f"Extracting text and images from {pdf_path}...")
-    pdf_extractor = PDFExtractor(output_dir="/tmp/pdf_out")
+    pdf_extractor = PDFExtractor(output_dir="extracted_data")
     result = pdf_extractor.extract(pdf_path)
     
     full_text = "\n".join([tb.text for tb in result.text_blocks])
@@ -87,9 +88,11 @@ async def process_pdf(pdf_path: str, llm: LLMCall) -> list[dict]:
         co = q.get("course_outcome", "CO2")
         module = q.get("module", 1)
         has_image = q.get("has_image", False)
+        context_text = q.get("context", f"Knowledge related to {topic}.")
         
         instruction = (
-            f"Generate a unique and high-quality academic question for a University Examination.\n\n"
+            f"Context:\n{context_text}\n\n"
+            f"Generate a unique and high-quality academic question for a University Examination based on the context above.\n\n"
             f"Constraints:\n"
             f"- Module: {module}\n"
             f"- Topic: {topic}\n"
@@ -103,10 +106,16 @@ async def process_pdf(pdf_path: str, llm: LLMCall) -> list[dict]:
             instruction += "- Modality: Includes an image diagram/reference.\n"
             
         instruction += "\nEnsure the question is academically rigorous, tests true comprehension, and avoids robotic phrasing."
+        instruction += '\n\nReturn a valid JSON object with keys "question" for the text and "has_image" as a boolean.'
+        
+        output_json = {
+            "question": q.get("text", ""),
+            "has_image": has_image
+        }
         
         entry = {
             "instruction": instruction,
-            "output": q.get("text", "")
+            "output": json.dumps(output_json)
         }
         
         # Attach image paths to the dataset entry if it requires an image
@@ -132,18 +141,36 @@ async def main():
     extracted_data = []
     
     print(f"Searching for PDFs in {pdf_dir}...")
-    with open(dataset_path, "w", encoding="utf-8") as f:
-        for filename in os.listdir(pdf_dir):
-            if filename.endswith(".pdf"):
-                pdf_path = os.path.join(pdf_dir, filename)
-                entries = await process_pdf(pdf_path, llm)
-                
-                for entry in entries:
-                    f.write(json.dumps(entry) + "\n")
+    
+    # Keep track of processed files to allow pausing/resuming
+    processed_files = set()
+    processed_log_path = "processed_pdfs.log"
+    if os.path.exists(processed_log_path):
+        with open(processed_log_path, "r", encoding="utf-8") as f:
+            processed_files = set(line.strip() for line in f)
+
+    # Open dataset in append mode so we don't overwrite previous runs
+    with open(dataset_path, "a", encoding="utf-8") as f:
+        with open(processed_log_path, "a", encoding="utf-8") as log_f:
+            for filename in os.listdir(pdf_dir):
+                if filename.endswith(".pdf"):
+                    if filename in processed_files:
+                        print(f"Skipping already processed file: {filename}")
+                        continue
+                        
+                    pdf_path = os.path.join(pdf_dir, filename)
+                    entries = await process_pdf(pdf_path, llm)
                     
-                print(f"Added {len(entries)} entries from {filename}")
-                
-    print(f"Dataset generated at {dataset_path}")
+                    for entry in entries:
+                        f.write(json.dumps(entry) + "\n")
+                        f.flush()
+                        
+                    # Mark as processed
+                    log_f.write(filename + "\n")
+                    log_f.flush()
+                    print(f"Added {len(entries)} entries from {filename}")
+                    
+    print(f"Dataset generated/updated at {dataset_path}")
 
 if __name__ == "__main__":
     asyncio.run(main())
